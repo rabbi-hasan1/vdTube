@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
 const userSchema = new mongoose.Schema(
   {
@@ -10,6 +11,7 @@ const userSchema = new mongoose.Schema(
       minlength: [3, "Username must be at least 3 characters long"],
       maxlength: [20, "Username cannot exceed 20 characters"],
       trim: true,
+      index: true,
     },
 
     email: {
@@ -21,6 +23,23 @@ const userSchema = new mongoose.Schema(
       match: [/\S+@\S+\.\S+/, "Please enter a valid email"],
     },
 
+    fullName: {
+      type: String,
+      required: [true, "Full name is required"],
+      trim: true,
+      minlength: [3, "Full name must be at least 3 characters long"],
+      maxlength: [100, "Full name cannot exceed 100 characters"],
+    },
+
+    avatar: {
+      type: String,
+      default: null,
+    },
+    coverPhoto: {
+      type: String,
+      default: null,
+    },
+
     password: {
       type: String,
       required: [true, "Password is required"],
@@ -29,6 +48,12 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
 
+    watchHistory: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Video",
+      },
+    ],
     refreshToken: {
       type: String,
       default: null,
@@ -47,6 +72,23 @@ userSchema.pre("save", async function () {
   this.password = await bcrypt.hash(this.password, 10);
 });
 
+userSchema.methods.comparePassword = async function (password) {
+  return await bcrypt.compare(password, this.password);
+};
+
+userSchema.methods.generateAccessToken = function () {
+  return jwt.sign(
+    { id: this._id, username: this.username, email: this.email },
+    process.env.ACCESS_TOKEN_SECRET,
+    { expiresIn: "15m" }
+  );
+};
+
+userSchema.methods.generateRefreshToken = function () {
+  return jwt.sign({ id: this._id }, process.env.REFRESH_TOKEN_SECRET, {
+    expiresIn: "7d",
+  });
+};
 
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 
