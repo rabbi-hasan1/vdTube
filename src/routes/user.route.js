@@ -1,11 +1,20 @@
 import { Router } from "express";
 import { body } from "express-validator";
-import { registerUser, loginUser, logoutUser ,getUserProfile } from "../controllers/user.controller.js";
-
+import {
+  registerUser,
+  loginUser,
+  logoutUser,
+  getUserProfile,
+} from "../controllers/user.controller.js";
+import {upload} from "../middleware/multer.middleware.js"
 const router = Router();
 
 router.post(
   "/register",
+  upload.fields([
+    { name: "avatar", maxCount: 1 },
+    { name: "coverPhoto", maxCount: 1 },
+  ]),
   [
     body("username")
       .notEmpty()
@@ -30,17 +39,19 @@ router.post(
   ],
   registerUser
 );
-router.post("/login", [
-  body("email")
-    .notEmpty()
-    .withMessage("email is required")
-    .isEmail()
-    .withMessage("email is not valid")
-    .normalizeEmail(),
-  body("password")
-    .notEmpty()
-    .withMessage("password is required")
-], loginUser);
+router.post(
+  "/login",
+  [
+    body("email")
+      .notEmpty()
+      .withMessage("email is required")
+      .isEmail()
+      .withMessage("email is not valid")
+      .normalizeEmail(),
+    body("password").notEmpty().withMessage("password is required"),
+  ],
+  loginUser
+);
 
 router.get("/logout", logoutUser);
 

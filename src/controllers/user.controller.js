@@ -1,9 +1,12 @@
 import { validationResult } from "express-validator";
 import User from "../models/user.model.js";
 import {asyncHandler} from "../utlits/asyncHandler.js"
-export async function registerUser(req, res) {
-  try {
+import uploadOnCloudinary from "../services/cloudinary.js";
+export const registerUser = asyncHandler(async (req, res) => {
+  
     const { username, email, password } = req.body;
+    const avatar = req.files?.avatar?.[0];
+    const coverPhoto = req.files?.coverPhoto?.[0];
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -12,30 +15,37 @@ export async function registerUser(req, res) {
 
     const isUserExists = await User.findOne({email}).select("-password");
     if (isUserExists) {
-      return res.status(400).json({
+      return res.status(409).json({
         message: "user already exists",
       });
     }
+
+
+  if (!avatar || !coverPhoto) {
+    return res.status(400).json({
+      message: "avatar and cover photo are required",
+    });
+  }
+
+  const profile = await uploadOnCloudinary(avatar)
+  const cover = await uploadOnCloudinary(coverPhoto)
 
     const user = await User.create({
       username,
       email,
       password,
+      avatar: profile.url,
+      coverPhoto: cover.url,
     });
 
     return res.status(200).json({
       message: "user registered successfully",
       user
     });
-  } catch (err) {
-    console.error(err?.message);
-    return res.status(500).json({
-      message: "internal server error",
-    });
-  }
-}
+ 
+});
 
-export async function loginUser(req, res){
+export const loginUser = asyncHandler(async (req, res) => {
     try {
         const { email, password } = req.body;
         const errors = validationResult(req);
@@ -51,9 +61,9 @@ export async function loginUser(req, res){
             message: "internal server error",
         });
     }
-}
+});
 
-export async function logoutUser(req, res){
+export const logoutUser = asyncHandler(async (req, res) => {
     try {
         return res.status(200).json({
             message: "user logged out successfully",
@@ -63,7 +73,7 @@ export async function logoutUser(req, res){
         return res.status(500).json({
             message: "internal server error",
         });
-    }}
+    }});
 
 export const getUserProfile = asyncHandler(async (req, res) => {
     res.status(200).json({
