@@ -4,7 +4,7 @@ import {asyncHandler} from "../utlits/asyncHandler.js"
 import uploadOnCloudinary from "../services/cloudinary.js";
 export const registerUser = asyncHandler(async (req, res) => {
   
-    const { username, email, password } = req.body;
+    const { username, email, password, fullName } = req.body;
     const avatar = req.files?.avatar?.[0];
     const coverPhoto = req.files?.coverPhoto?.[0];
     const errors = validationResult(req);
@@ -33,9 +33,10 @@ export const registerUser = asyncHandler(async (req, res) => {
     const user = await User.create({
       username,
       email,
+      fullName,
       password,
-      avatar: profile.url,
-      coverPhoto: cover.url,
+      avatar: profile?.url,
+      coverPhoto: cover?.url,
     });
 
     return res.status(200).json({
