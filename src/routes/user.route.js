@@ -5,8 +5,10 @@ import {
   loginUser,
   logoutUser,
   getUserProfile,
+  refreshToken
 } from "../controllers/user.controller.js";
 import {upload} from "../middleware/multer.middleware.js"
+import { checkAuth } from "../middleware/auth.middleware.js";
 const router = Router();
 
 router.post(
@@ -53,8 +55,9 @@ router.post(
   loginUser
 );
 
-router.get("/logout", logoutUser);
+router.get("/logout", checkAuth, logoutUser);
+router.get("/refreshToken", checkAuth, refreshToken)
 
-router.get("/profile", getUserProfile);
+router.get("/profile", checkAuth, getUserProfile);
 
 export default router;
