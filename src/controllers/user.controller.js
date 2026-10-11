@@ -181,34 +181,52 @@ export const updateUserName = asyncHandler(async (req, res) => {
 });
 
 export const changePassword = asyncHandler(async (req, res) => {
-  try{
-    const {oldPassword, newPassword} = req.body;
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json(new ApiError(400, "validation error", errors.array()));
-    }
-    if(!oldPassword || !newPassword){
-      return res.status(400).json(new ApiError(400, "old password and new password are required"));
-    }
+  const { oldPassword, newPassword } = req.body;
 
+  const errors = validationResult(req);
 
-    const user = await User.findById(req.user.id).select("+password)");
-
-    const isPasswordMatch = await user.comparePassword(oldPassword);
-
-    if(!isPasswordMatch){
-      return res.status(401).json(new ApiError(401, "old password is incorrect"));
-    }
-    
-
-    user.password = newPassword;
-    user.save();
-    return res.status(200).json(new ApiResponse(200, {}, "password changed successfully"));
-
-  }catch(error){
-    return res.status(500).json(new ApiError(500, "internal server error"));
+  if (!errors.isEmpty()) {
+    return res
+      .status(400)
+      .json(new ApiError(400, "Validation error", errors.array()));
   }
-})
+
+  if (!oldPassword || !newPassword) {
+    return res
+      .status(400)
+      .json(
+        new ApiError(
+          400,
+          "Old password and new password are required"
+        )
+      );
+  }
+
+  const user = await User.findById(req.user.id).select("+password");
+
+  if (!user) {
+    return res
+      .status(404)
+      .json(new ApiError(404, "User not found"));
+  }
+
+  const isPasswordMatch = await user.comparePassword(oldPassword);
+
+  if (!isPasswordMatch) {
+    return res
+      .status(401)
+      .json(new ApiError(401, "Old password is incorrect"));
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, {}, "Password changed successfully")
+    );
+});
 
 
 export const updateUserProfile = asyncHandler(async (req, res) => {
