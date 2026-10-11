@@ -9,9 +9,8 @@ const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "strict",
-  maxAge: 7 * 24 * 60 * 60 * 1000, 
+  maxAge: 7 * 24 * 60 * 60 * 1000,
 };
-
 
 export const registerUser = asyncHandler(async (req, res) => {
   const { username, email, password, fullName } = req.body;
@@ -22,17 +21,21 @@ export const registerUser = asyncHandler(async (req, res) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const isUserExists = await User.findOne({ email }).select("-password");
-  if (isUserExists) {
-    return res.status(409).json({
-      message: "user already exists",
-    });
-  }
+const isUserExists = await User.findOne({
+  $or: [
+    { email },
+    { username },
+  ],
+}).select("-password");
+
+if (isUserExists) {
+  return res.status(409).json(
+    new ApiError(409, "User already exists")
+  );
+}
 
   if (!avatar || !coverPhoto) {
-    return res.status(400).json({
-      message: "avatar and cover photo are required",
-    });
+    return res.status(400).json(new ApiError(400, "avatar and cover photo are required"));
   }
 
   const profile = await uploadOnCloudinary(avatar);
@@ -47,10 +50,7 @@ export const registerUser = asyncHandler(async (req, res) => {
     coverPhoto: cover?.url,
   });
 
-  return res.status(200).json({
-    message: "user registered successfully",
-    user,
-  });
+  return res.status(200).json(new ApiResponse(200, { user }, "user registered successfully"));
 });
 
 export const loginUser = asyncHandler(async (req, res) => {
@@ -148,9 +148,106 @@ export const refreshToken = asyncHandler(async (req, res) => {
       .status(200)
       .cookie("accessToken", newAccessToken, cookieOptions)
       .cookie("refreshToken", newRefreshToken, cookieOptions)
-      .json(new ApiResponse(200, { accessToken: newAccessToken }, "token refreshed successfully"));
+      .json(
+        new ApiResponse(
+          200,
+          { accessToken: newAccessToken },
+          "token refreshed successfully"
+        )
+      );
+  } catch (error) {
+    return res.status(500).json(new ApiError(500, "internal server error"));
+  }
+});
+
+export const updateUserName = asyncHandler(async (req, res) => {
+  try {
+    const { username } = req.body;
+    if (!username) {
+      return res.status(400).json(new ApiError(400, "username is required"));
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { username },
+      { new: true }
+    ).select("-password -refreshToken");
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { user }, "username updated successfully"));
+  } catch (error) {
+    return res.status(500).json(new ApiError(500, "internal server error"));
+  }
+});
+
+export const changePassword = asyncHandler(async (req, res) => {
+  try{
+    const {oldPassword, newPassword} = req.body;
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json(new ApiError(400, "validation error", errors.array()));
+    }
+    if(!oldPassword || !newPassword){
+      return res.status(400).json(new ApiError(400, "old password and new password are required"));
+    }
+
+
+    const user = await User.findById(req.user.id).select("+password)");
+
+    const isPasswordMatch = await user.comparePassword(oldPassword);
+
+    if(!isPasswordMatch){
+      return res.status(401).json(new ApiError(401, "old password is incorrect"));
+    }
+    
+
+    user.password = newPassword;
+    user.save();
+    return res.status(200).json(new ApiResponse(200, {}, "password changed successfully"));
+
+  }catch(error){
+    return res.status(500).json(new ApiError(500, "internal server error"));
+  }
+})
+
+
+export const updateUserProfile = asyncHandler(async (req, res) => {
+  try{
+    const {username, fullName} = req.body;
+    const avatar = req.files?.avatar?.[0];
+    const coverPhoto = req.files?.coverPhoto?.[0];
+     
+    if(!username && !fullName && !avatar && !coverPhoto){
+      return res.status(400).json(new ApiError(400, "at least one field is required to update profile"));
+    }
+
+    const user = await User.findById(req.user.id);
+    if(!user){
+      return res.status(404).json(new ApiError(404, "user not found"));
+    }
+
+    if(username){
+      user.username = username;
+    }
+
+    if(fullName){
+      user.fullName = fullName;
+    }
+    if(avatar){
+      const profile = await uploadOnCloudinary(avatar);
+      user.avatar = profile?.url;
+    }
+    if(coverPhoto){
+      const cover = await uploadOnCloudinary(coverPhoto);
+      user.coverPhoto = cover?.url;
+    }
+    await user.save();
+
+    return res.status(200).json(new ApiResponse(200, {user}, "profile updated successfully"));
 
   }catch(error){
     return res.status(500).json(new ApiError(500, "internal server error"));
   }
 });
+
+
